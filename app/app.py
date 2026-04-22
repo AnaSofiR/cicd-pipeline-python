@@ -1,43 +1,54 @@
 # app/app.py
-"""
-Módulo app.py
-"""
+"""Módulo app.py"""
+
+import os
+from dotenv import load_dotenv
 from flask import Flask, render_template, request
+from flask_wtf.csrf import CSRFProtect
 from .calculadora import sumar, restar, multiplicar, dividir
 
+load_dotenv()
+
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
+csrf = CSRFProtect(app)
 
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    """
-    Método main
-    """
-    resultado = None
-    if request.method == "POST":
-        try:
-            num1 = float(request.form["num1"])
-            num2 = float(request.form["num2"])
-            operacion = request.form["operacion"]
+def _resultado_from_post() -> str | float | None:
+    """Calcular el resultado del form POST."""
+    try:
+        num1 = float(request.form["num1"])
+        num2 = float(request.form["num2"])
+        operacion = request.form["operacion"]
+        operaciones = {
+            "sumar": sumar,
+            "restar": restar,
+            "multiplicar": multiplicar,
+            "dividir": dividir,
+        }
+        funcion = operaciones.get(operacion)
+        if funcion is None:
+            return "Operación no válida"
+        return funcion(num1, num2)
+    except ValueError:
+        return "Error: Introduce números válidos"
+    except ZeroDivisionError:
+        return "Error: No se puede dividir por cero"
 
-            if operacion == "sumar":
-                resultado = sumar(num1, num2)
-            elif operacion == "restar":
-                resultado = restar(num1, num2)
-            elif operacion == "multiplicar":
-                resultado = multiplicar(num1, num2)
-            elif operacion == "dividir":
-                resultado = dividir(num1, num2)
-            else:
-                resultado = "Operación no válida"
-        except ValueError:
-            resultado = "Error: Introduce números válidos"
-        except ZeroDivisionError:
-            resultado = "Error: No se puede dividir por cero"
 
-    return render_template("index.html", resultado=resultado)
+@app.get("/")
+def index_get():
+    """Mostrar el formulario de la calculadora."""
+    return render_template("index.html", resultado=None)
+
+
+@app.post("/")
+def index_post():
+    """Procesar el envío del formulario y mostrar el resultado."""
+    return render_template("index.html", resultado=_resultado_from_post())
 
 
 if __name__ == "__main__":  # pragma: no cover
-    app.run(debug=True, port=5000, host="127.0.0.1") 
+    app.run(debug=True, port=5000, host="127.0.0.1")
     # Quita debug=True para producción
